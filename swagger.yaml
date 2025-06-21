@@ -1,0 +1,615 @@
+openapi: 3.0.0
+info:
+  title: Auth-Service API
+  version: 1.0.0
+  description: A concise and robust authentication service for applications requiring user management and secure JWT-based token generation. It provides endpoints for user registration, login, token refreshing, and profile management, all secured with ECDSA-signed tokens.
+servers:
+  - url: /
+    description: Local server
+paths:
+  /health:
+    get:
+      summary: Check Service Status
+      operationId: CheckServiceStatus
+      description: Checks the operational status of the authentication service to ensure it is running correctly.
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Service is healthy and operational.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '500':
+          description: Internal server error, indicating a problem with the service.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: An internal server error occurred
+  '/.well-known/jwks.json':
+    get:
+      summary: Get JWKS
+      operationId: GetJWKS
+      description: Provides the JSON Web Key Set (JWKS) containing the public key required to verify the signature of JWTs issued by this service.
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: A JWKS document containing the public keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+        '500':
+          description: Internal server error, if the JWKS cannot be generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/register:
+    post:
+      summary: Register User
+      operationId: RegisterUser
+      description: Registers a new user account with a unique username, email, and a password.
+      tags:
+        - User Management
+      requestBody:
+        $ref: '#/components/requestBodies/RegisterUserBody'
+      responses:
+        '201':
+          description: User account created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Bad Request - Invalid input data, such as missing fields or an invalid email format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidBody:
+                  value:
+                    error: Invalid request body
+        '409':
+          description: Conflict - The provided username or email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                userExists:
+                  value:
+                    error: Username or email already exists
+        '500':
+          description: Internal server error, such as a failure to hash the password or a database issue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  value:
+                    error: Failed to create user
+  /v1/login:
+    post:
+      summary: Login User
+      operationId: LoginUser
+      description: Authenticates a user with their identifier (username or email) and password, issuing JWT access and refresh tokens upon success.
+      tags:
+        - Authentication
+      requestBody:
+        $ref: '#/components/requestBodies/LoginUserBody'
+      responses:
+        '200':
+          description: Authentication successful. Access and refresh tokens are returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Bad Request - Invalid input data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidBody:
+                  value:
+                    error: Invalid request body
+        '401':
+          description: Unauthorized - Invalid credentials provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidCredentials:
+                  value:
+                    error: Invalid credentials
+        '500':
+          description: Internal server error during the login process.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                tokenGenerationFailed:
+                  value:
+                    error: Failed to generate tokens
+  /v1/logout:
+    post:
+      summary: Logout User
+      operationId: LogoutUser
+      description: Invalidates the provided refresh token by adding it to a blacklist, effectively logging the user out.
+      tags:
+        - Authentication
+      requestBody:
+        $ref: '#/components/requestBodies/RefreshTokenBody'
+      responses:
+        '200':
+          description: User logged out successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Bad Request - The refresh token is missing from the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidBody:
+                  value:
+                    error: Invalid request body
+        '401':
+          description: Unauthorized - The provided refresh token is invalid or expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidToken:
+                  value:
+                    error: Invalid or expired refresh token
+        '500':
+          description: Internal server error, such as a failure to blacklist the token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                blacklistFailed:
+                  value:
+                    error: Failed to blacklist token
+  /v1/refresh-token:
+    post:
+      summary: Refresh Tokens
+      operationId: RefreshTokens
+      description: Uses a valid refresh token to obtain a new access token and a new refresh token, extending the user's session.
+      tags:
+        - Authentication
+      requestBody:
+        $ref: '#/components/requestBodies/RefreshTokenBody'
+      responses:
+        '200':
+          description: New access and refresh tokens have been issued successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Bad Request - The refresh token is missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidBody:
+                  value:
+                    error: Invalid request body
+        '401':
+          description: Unauthorized - The refresh token is invalid, expired, or the associated user is not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidToken:
+                  value:
+                    error: Invalid or expired refresh token
+        '500':
+          description: Internal server error, such as a failure to generate new tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                tokenGenerationFailed:
+                  value:
+                    error: Failed to generate new tokens
+  /v1/me:
+    get:
+      summary: Get My Info
+      operationId: GetMyInfo
+      description: Retrieves the profile information for the currently authenticated user.
+      tags:
+        - User Management
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User information retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '401':
+          description: Unauthorized - The access token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    error: Invalid or expired access token
+        '404':
+          description: Not Found - The authenticated user's record does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    error: User not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  value:
+                    error: Failed to retrieve user information
+    put:
+      summary: Update My Info
+      operationId: UpdateMyInfo
+      description: Updates the username and/or email for the currently authenticated user.
+      tags:
+        - User Management
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/UpdateUserBody'
+      responses:
+        '200':
+          description: User information updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Bad Request - Invalid input data or no update fields provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noFields:
+                  value:
+                    error: No update fields provided
+        '401':
+          description: Unauthorized - The access token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    error: Invalid or expired access token
+        '404':
+          description: Not Found - The authenticated user's record does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    error: User not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                updateFailed:
+                  value:
+                    error: Failed to update username
+    delete:
+      summary: Delete My Account
+      operationId: DeleteMyAccount
+      description: Permanently deletes the account of the currently authenticated user. This action is irreversible.
+      tags:
+        - User Management
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User account deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized - The access token is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  value:
+                    error: Invalid or expired access token
+        '404':
+          description: Not Found - The authenticated user's record does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    error: User not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                deleteFailed:
+                  value:
+                    error: Failed to delete user
+  /v1/me/change-password:
+    post:
+      summary: Change My Password
+      operationId: ChangeMyPassword
+      description: Allows an authenticated user to change their password by providing their current password and a new one.
+      tags:
+        - User Management
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/ChangePasswordBody'
+      responses:
+        '200':
+          description: Password changed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Bad Request - Required fields are missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidBody:
+                  value:
+                    error: Invalid request body
+        '401':
+          description: Unauthorized - The provided current password is incorrect or the token is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidPassword:
+                  value:
+                    error: Invalid current password
+        '404':
+          description: Not Found - The authenticated user's record does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    error: User not found
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                updateFailed:
+                  value:
+                    error: Failed to update password
+components:
+  schemas:
+    RegisterUser:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          description: Desired username for the new account.
+          example: newuser
+        email:
+          type: string
+          format: email
+          description: Email address for the new account.
+          example: newuser@example.com
+        password:
+          type: string
+          description: Password for the new account.
+          example: StrongPassword123
+    LoginUser:
+      type: object
+      required:
+        - identifier
+        - password
+      properties:
+        identifier:
+          type: string
+          description: User's username or email address.
+          example: newuser
+        password:
+          type: string
+          description: User's password.
+          example: StrongPassword123
+    RefreshToken:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: The refresh token obtained during login or a previous refresh.
+          example: eyJhbGciOiJFUzI1Ni...
+    UpdateUser:
+      type: object
+      properties:
+        username:
+          type: string
+          description: New username for the user.
+          example: updated_username
+        email:
+          type: string
+          format: email
+          description: New email address for the user.
+          example: updated_email@example.com
+    ChangePassword:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          description: The user's current password.
+          example: StrongPassword123
+        new_password:
+          type: string
+          description: The desired new password.
+          example: ANewerStrongerPassword456
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: A short-lived JWT for accessing protected resources.
+          example: eyJhbGciOiJFUzI1Ni...
+        refresh_token:
+          type: string
+          description: A long-lived JWT for obtaining new access tokens.
+          example: eyJhbGciOiJFUzI1Ni...
+    UserInfoResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        username:
+          type: string
+          example: newuser
+        email:
+          type: string
+          format: email
+          example: newuser@example.com
+        created_at:
+          type: string
+          format: date-time
+        last_updated:
+          type: string
+          format: date-time
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Indicates the operational status of the service.
+          example: UP
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: A confirmation or status message.
+          example: User created successfully
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A brief description of the error.
+        details:
+          type: string
+          description: Optional field for more detailed error information.
+  requestBodies:
+    RegisterUserBody:
+      description: Data for registering a new user.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterUser'
+    LoginUserBody:
+      description: Credentials for user login.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginUser'
+    RefreshTokenBody:
+      description: The refresh token required to obtain new tokens or to log out.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RefreshToken'
+    UpdateUserBody:
+      description: Fields to update for the authenticated user.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateUser'
+    ChangePasswordBody:
+      description: The current and new passwords for a password change operation.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ChangePassword'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A JWT access token is required to access this endpoint. It should be provided in the Authorization header as a Bearer token.

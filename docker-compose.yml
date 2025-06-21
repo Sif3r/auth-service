@@ -1,0 +1,68 @@
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '${EXTERNAL_PORT}:${INTERNAL_PORT}'
+    environment:
+      GIN_MODE: ${GIN_MODE}
+      PORT: ${INTERNAL_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      PRIVATE_KEY_PATH: ${PRIVATE_KEY_PATH}
+      PUBLIC_KEY_PATH: ${PUBLIC_KEY_PATH}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      REDIS_URL: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      PRIVATE_KEY_PATH: /run/secrets/jwt_private_key_pkcs8.pem
+      PUBLIC_KEY_PATH: /run/secrets/jwt_public_key.pem
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - auth-network
+    restart: unless-stopped
+    volumes:
+      - ./jwt_private_key_pkcs8.pem:/run/secrets/jwt_private_key_pkcs8.pem:ro,z
+      - ./jwt_public_key.pem:/run/secrets/jwt_public_key.pem:ro,z
+  db:
+    image: ghcr.io/fboulnois/pg_uuidv7:1.6.0
+    environment:
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_POSTGRES_NAME}
+    volumes:
+      - 'db_data:/var/lib/postgresql/data'
+      - './schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:z'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - auth-network
+    restart: unless-stopped
+  redis:
+    image: redis:8-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
+    networks:
+      - auth-network
+    restart: unless-stopped
+
+volumes:
+  db_data: null
+
+networks:
+  auth-network:
+    driver: bridge
