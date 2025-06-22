@@ -15,7 +15,7 @@ import (
 	"github.com/Sif3r/auth-service/internal/config"
 	"github.com/Sif3r/auth-service/internal/repository"
 	"github.com/Sif3r/auth-service/internal/token"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -36,15 +36,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	conn, err := pgx.Connect(ctx, cfg.DatabaseURL)
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("unable to connect to database: %w", err)
+		return fmt.Errorf("unable to create connection pool: %w", err)
 	}
-	defer func() {
-		if cerr := conn.Close(context.Background()); cerr != nil {
-			logger.Error("Failed to close database connection", "error", cerr)
-		}
-	}()
+	defer pool.Close()
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisURL,
@@ -56,7 +52,7 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("could not connect to Redis: %w", err)
 	}
 
-	queries := repository.New(conn)
+	queries := repository.New(pool)
 	tm, err := token.NewTokenManager(*cfg, redisClient)
 	if err != nil {
 		return fmt.Errorf("failed to create token manager: %w", err)
