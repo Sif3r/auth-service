@@ -1,4 +1,4 @@
-name: Go LintAdd commentMore actions
+name: Go Lint
 
 on:
   push:
