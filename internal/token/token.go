@@ -160,38 +160,37 @@ func (tm *Manager) getKeyVerificationFunction() jwt.Keyfunc {
 func (tm *Manager) ValidateRefreshToken(
 	ctx context.Context,
 	refreshTokenString string,
-) (string, error) {
+) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(refreshTokenString, claims, tm.getKeyVerificationFunction())
 
 	if err != nil {
-		return "", fmt.Errorf("invalid refresh token: %w", err)
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
 	}
 
 	if !token.Valid {
-		return "", errors.New("invalid refresh token: token is not valid")
+		return nil, errors.New("invalid refresh token: token is not valid")
 	}
 
 	if claims.Type != "refresh" {
-		return "", errors.New("invalid token type: not a refresh token")
+		return nil, errors.New("invalid token type: not a refresh token")
 	}
 
 	if claims.UserID == "" {
-		return "", errors.New("invalid refresh token: missing user ID")
+		return nil, errors.New("invalid refresh token: missing user ID")
 	}
 
 	_, err = tm.RedisClient.Get(ctx, claims.ID).Result()
 	if err == nil {
-		return "", errors.New("invalid refresh token: token has been blacklisted")
+		return nil, errors.New("invalid refresh token: token has been blacklisted")
 	}
 	if !errors.Is(err, redis.Nil) {
-		return "", fmt.Errorf("failed to check refresh token blacklist: %w", err)
+		return nil, fmt.Errorf("failed to check refresh token blacklist: %w", err)
 	}
 
-	return claims.UserID, nil
+	return claims, nil
 }
 
-// ValidateAccessToken validates an access token and returns the claims.
 func (tm *Manager) ValidateAccessToken(accessTokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(accessTokenString, claims, tm.getKeyVerificationFunction())
@@ -213,12 +212,6 @@ func (tm *Manager) ValidateAccessToken(accessTokenString string) (*Claims, error
 	}
 
 	return claims, nil
-}
-
-func (tm *Manager) GetClaims(tokenString string) (*Claims, error) {
-	claims := &Claims{}
-	_, _, err := new(jwt.Parser).ParseUnverified(tokenString, claims)
-	return claims, err
 }
 
 func (tm *Manager) BlacklistJTI(ctx context.Context, jti string, expTimestamp int64) error {

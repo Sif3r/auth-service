@@ -409,9 +409,10 @@ func TestValidateRefreshToken_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := t.Context()
-	validatedUserID, err := tm.ValidateRefreshToken(ctx, refreshToken)
+	claims, err := tm.ValidateRefreshToken(ctx, refreshToken)
 	require.NoError(t, err)
-	assert.Equal(t, userID, validatedUserID)
+	assert.Equal(t, userID, claims.UserID)
+	assert.Equal(t, "refresh", claims.Type)
 }
 
 func TestValidateRefreshToken_ExpiredToken(t *testing.T) {
@@ -603,13 +604,16 @@ func TestValidateRefreshToken_BlacklistedToken(t *testing.T) {
 	refreshToken, err := tm.GenerateRefreshToken(userID)
 	require.NoError(t, err)
 
-	claims, err := tm.GetClaims(refreshToken)
+	// First validate to get claims
+	claims, err := tm.ValidateRefreshToken(t.Context(), refreshToken)
 	require.NoError(t, err)
 
+	// Blacklist the token
 	ctx := t.Context()
 	err = tm.BlacklistJTI(ctx, claims.ID, claims.ExpiresAt.Time.Unix())
 	require.NoError(t, err)
 
+	// Now validation should fail
 	_, err = tm.ValidateRefreshToken(ctx, refreshToken)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid refresh token: token has been blacklisted")
@@ -650,76 +654,6 @@ func TestValidateRefreshToken_RedisError(t *testing.T) {
 		t,
 		err.Error(),
 		"failed to check refresh token blacklist: simulated redis error",
-	)
-}
-
-func TestGetClaims_ValidToken(t *testing.T) {
-	privateKey, publicKey := generateTestKeys(t)
-	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	require.NoError(t, err)
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	require.NoError(t, err)
-
-	privateKeyPath, publicKeyPath := createTempKeyFiles(
-		t,
-		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyBytes}),
-		pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyBytes}),
-	)
-	cfg := config.Config{
-		PrivateKeyPath: privateKeyPath,
-		PublicKeyPath:  publicKeyPath,
-		Issuer:         "test-issuer",
-		Audience:       []string{"test-audience"},
-	}
-	redisClient := newMockRedisClient()
-	tm, err := token.NewTokenManager(cfg, redisClient)
-	require.NoError(t, err)
-
-	userID := "some-user-id"
-	accessToken, err := tm.GenerateAccessToken(userID)
-	require.NoError(t, err)
-
-	claims, err := tm.GetClaims(accessToken)
-	require.NoError(t, err)
-	assert.NotNil(t, claims)
-	assert.Equal(t, userID, claims.UserID)
-	assert.Equal(t, "access", claims.Type)
-}
-
-func TestGetClaims_InvalidToken(t *testing.T) {
-	privateKey, publicKey := generateTestKeys(t)
-	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	require.NoError(t, err)
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	require.NoError(t, err)
-
-	privateKeyPath, publicKeyPath := createTempKeyFiles(
-		t,
-		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyBytes}),
-		pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKeyBytes}),
-	)
-	cfg := config.Config{
-		PrivateKeyPath: privateKeyPath,
-		PublicKeyPath:  publicKeyPath,
-		Issuer:         "test-issuer",
-		Audience:       []string{"test-audience"},
-	}
-	redisClient := newMockRedisClient()
-	tm, err := token.NewTokenManager(cfg, redisClient)
-	require.NoError(t, err)
-
-	invalidToken := "invalid.jwt.token"
-	claims, err := tm.GetClaims(invalidToken)
-	require.Error(t, err)
-
-	assert.Empty(t, claims.UserID, "Claims UserID should be empty for an invalid token")
-	assert.Empty(t, claims.Type, "Claims Type should be empty for an invalid token")
-
-	assert.Contains(
-		t,
-		err.Error(),
-		"token is malformed",
-		"Error message should indicate a malformed token",
 	)
 }
 

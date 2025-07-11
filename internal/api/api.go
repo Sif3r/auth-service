@@ -272,7 +272,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	userID, err := h.tokenManager.ValidateRefreshToken(c, req.RefreshToken)
+	claims, err := h.tokenManager.ValidateRefreshToken(c, req.RefreshToken)
 	if err != nil {
 		handleError(
 			c,
@@ -285,7 +285,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	parsedUserID, err := uuid.Parse(userID)
+	parsedUserID, err := uuid.Parse(claims.UserID)
 	if err != nil {
 		handleError(
 			c,
@@ -316,7 +316,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	newRefreshToken, newAccessToken, err := h.tokenManager.GenerateTokens(userID)
+	newRefreshToken, newAccessToken, err := h.tokenManager.GenerateTokens(claims.UserID)
 	if err != nil {
 		handleError(
 			c,
@@ -345,26 +345,13 @@ func (h *Handler) Logout(c *gin.Context) {
 		return
 	}
 
-	_, err := h.tokenManager.ValidateRefreshToken(c, req.RefreshToken)
+	claims, err := h.tokenManager.ValidateRefreshToken(c, req.RefreshToken)
 	if err != nil {
 		handleError(
 			c,
 			newAPIError(
 				http.StatusUnauthorized,
 				gin.H{"error": "Invalid or expired refresh token"},
-				err,
-			),
-		)
-		return
-	}
-
-	claims, err := h.tokenManager.GetClaims(req.RefreshToken)
-	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to process token claims"},
 				err,
 			),
 		)
