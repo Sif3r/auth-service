@@ -1,0 +1,25 @@
+# Git and Docker files
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Environment and secret files
+.env
+.env.example
+jwt_private_key_pkcs8.pem
+jwt_public_key.pem
+session_secret.txt
+redis_password.txt
+
+# Go module cache and test files
+vendor/
+*.test.go
+
+# IDE and local config
+.vscode/
+.idea/
+
+# Documentation
+README.md

@@ -23,6 +23,8 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.POST("/login", handler.LoginUser)
 		v1.POST("/refresh-token", handler.RefreshToken)
 		v1.POST("/logout", handler.Logout)
+		v1.GET("/:provider", handler.BeginAuth)
+		v1.GET("/:provider/callback", handler.AuthCallback)
 
 		authenticated := v1.Group("/me")
 		authenticated.Use(middleware.AuthMiddleware(handler.tokenManager, handler.Logger))

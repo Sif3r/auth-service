@@ -13,9 +13,12 @@ import (
 
 	"github.com/Sif3r/auth-service/internal/api"
 	"github.com/Sif3r/auth-service/internal/config"
+	"github.com/Sif3r/auth-service/internal/oauth"
 	"github.com/Sif3r/auth-service/internal/repository"
 	"github.com/Sif3r/auth-service/internal/token"
+	"github.com/gorilla/sessions"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/markbates/goth/gothic"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -27,6 +30,25 @@ const (
 	shutdownTimeout   = 5 * time.Second
 )
 
+func initOAuth(cfg *config.Config) {
+	dayInSecond := 86400
+	days := 30
+
+	store := sessions.NewCookieStore([]byte(cfg.SessionSecret))
+	store.MaxAge(days * dayInSecond)
+	store.Options.Path = "/"
+	store.Options.HttpOnly = true
+	if cfg.GinMode == "release" {
+		store.Options.Secure = true
+	} else {
+		store.Options.Secure = false
+	}
+	//nolint:reassign // gothic.Store is a global variable that must be configured.
+	gothic.Store = store
+
+	oauth.InitProviders(cfg)
+}
+
 func run(logger *slog.Logger) error {
 	ctx := context.Background()
 
@@ -35,6 +57,8 @@ func run(logger *slog.Logger) error {
 		logger.Error("Failed to load configuration", "error", err)
 		return err
 	}
+
+	initOAuth(cfg)
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {

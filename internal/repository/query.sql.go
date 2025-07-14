@@ -11,6 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createOAuthIdentity = `-- name: CreateOAuthIdentity :one
+INSERT INTO oauth_identities (
+  provider_user_id, provider, user_id
+) VALUES (
+  $1, $2, $3
+)
+RETURNING provider_user_id, provider, user_id, created_at
+`
+
+type CreateOAuthIdentityParams struct {
+	ProviderUserID string
+	Provider       string
+	UserID         pgtype.UUID
+}
+
+func (q *Queries) CreateOAuthIdentity(ctx context.Context, arg CreateOAuthIdentityParams) (OauthIdentity, error) {
+	row := q.db.QueryRow(ctx, createOAuthIdentity, arg.ProviderUserID, arg.Provider, arg.UserID)
+	var i OauthIdentity
+	err := row.Scan(
+		&i.ProviderUserID,
+		&i.Provider,
+		&i.UserID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO auth (
   username, email, password_hash
@@ -23,7 +50,7 @@ RETURNING id, username, email, created_at, last_updated
 type CreateUserParams struct {
 	Username     string
 	Email        string
-	PasswordHash string
+	PasswordHash pgtype.Text
 }
 
 type CreateUserRow struct {
@@ -55,6 +82,28 @@ WHERE id = $1
 func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
+}
+
+const getOAuthIdentity = `-- name: GetOAuthIdentity :one
+SELECT provider_user_id, provider, user_id, created_at FROM oauth_identities
+WHERE provider_user_id = $1 AND provider = $2
+`
+
+type GetOAuthIdentityParams struct {
+	ProviderUserID string
+	Provider       string
+}
+
+func (q *Queries) GetOAuthIdentity(ctx context.Context, arg GetOAuthIdentityParams) (OauthIdentity, error) {
+	row := q.db.QueryRow(ctx, getOAuthIdentity, arg.ProviderUserID, arg.Provider)
+	var i OauthIdentity
+	err := row.Scan(
+		&i.ProviderUserID,
+		&i.Provider,
+		&i.UserID,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -140,7 +189,7 @@ WHERE id = $1
 
 type UpdateUserPasswordParams struct {
 	ID           pgtype.UUID
-	PasswordHash string
+	PasswordHash pgtype.Text
 }
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
