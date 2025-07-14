@@ -115,7 +115,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	arg := repository.CreateUserParams{
 		Username:     req.Username,
 		Email:        req.Email,
-		PasswordHash: string(passwordHashed),
+		PasswordHash: pgtype.Text{String: string(passwordHashed), Valid: true},
 	}
 
 	_, err = h.repo.CreateUser(c.Request.Context(), arg)
@@ -176,7 +176,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 		return
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.Password)); err != nil {
 		handleError(
 			c,
 			newAPIError(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"}, err),
@@ -518,7 +518,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.CurrentPassword)); err != nil {
 		handleError(
 			c,
 			newAPIError(http.StatusUnauthorized, gin.H{"error": "Invalid current password"}, err),
@@ -541,7 +541,10 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 
 	err = h.repo.UpdateUserPassword(
 		c.Request.Context(),
-		repository.UpdateUserPasswordParams{ID: pgUserID, PasswordHash: string(newPasswordHash)},
+		repository.UpdateUserPasswordParams{
+			ID:           pgUserID,
+			PasswordHash: pgtype.Text{String: string(newPasswordHash), Valid: true},
+		},
 	)
 	if err != nil {
 		handleError(

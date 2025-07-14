@@ -4,7 +4,15 @@ CREATE TABLE auth (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
     username VARCHAR(20) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE oauth_identities (
+    provider_user_id VARCHAR(255) NOT NULL,
+    provider VARCHAR(50) NOT NULL,
+    user_id UUID NOT NULL REFERENCES auth(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (provider_user_id, provider)
 );

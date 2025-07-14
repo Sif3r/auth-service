@@ -13,10 +13,14 @@ services:
       PUBLIC_KEY_PATH: ${PUBLIC_KEY_PATH}
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
-      REDIS_URL: redis:6379
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      CALLBACK_URL: ${CALLBACK_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      REDIS_URL: ${REDIS_URL}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      PRIVATE_KEY_PATH: /run/secrets/jwt_private_key_pkcs8.pem
-      PUBLIC_KEY_PATH: /run/secrets/jwt_public_key.pem
     depends_on:
       db:
         condition: service_healthy

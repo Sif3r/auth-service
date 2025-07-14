@@ -12,7 +12,14 @@ type Auth struct {
 	ID           pgtype.UUID
 	Username     string
 	Email        string
-	PasswordHash string
+	PasswordHash pgtype.Text
 	CreatedAt    pgtype.Timestamptz
 	LastUpdated  pgtype.Timestamptz
+}
+
+type OauthIdentity struct {
+	ProviderUserID string
+	Provider       string
+	UserID         pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
 }

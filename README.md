@@ -7,6 +7,7 @@ without the overhead of larger solutions like Supabase or Auth0. This service pr
 - **User Authentication & Management**: Securely register new users, authenticate them, and perform full CRUD operations on user profiles.
 - **Secure Token Generation**: Generates short-lived access and long-lived refresh tokens using **ECDSA (ES256)** for strong security.
 - **Token Invalidation**: Utilizes a **Redis-based blacklist** to immediately invalidate tokens upon logout, preventing reuse.
+- **OAuth2 Integration**: Supports authentication via Google and GitHub.
 - **Public Key Distribution**: Standard `/.well-known/jwks.json` endpoint for clients to fetch public keys and verify JWT signatures.
 - **Health & Logging**: Includes a `/health` endpoint for monitoring and structured, correlation-ID-tagged logging for traceable requests.
 
