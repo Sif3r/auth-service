@@ -7,6 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Common error messages to avoid duplication
+const (
+	ErrInvalidRequestBody = "Invalid request body"
+	ErrInvalidCredentials = "Invalid credentials"
+	ErrUserNotFound       = "User not found"
+	ErrInternalServer     = "An internal server error occurred"
+)
+
 type apiError struct {
 	code        int
 	message     gin.H
@@ -28,6 +36,22 @@ func newAPIError(code int, message gin.H, internalErr error) *apiError {
 	}
 }
 
+func newInvalidRequestBodyError(err error) *apiError {
+	return newAPIError(http.StatusBadRequest, gin.H{"error": ErrInvalidRequestBody}, err)
+}
+
+func newInvalidCredentialsError(err error) *apiError {
+	return newAPIError(http.StatusUnauthorized, gin.H{"error": ErrInvalidCredentials}, err)
+}
+
+func newUserNotFoundError(err error) *apiError {
+	return newAPIError(http.StatusNotFound, gin.H{"error": ErrUserNotFound}, err)
+}
+
+func newInternalServerError(message string, err error) *apiError {
+	return newAPIError(http.StatusInternalServerError, gin.H{"error": message}, err)
+}
+
 func handleError(c *gin.Context, err error) {
 	logger := getLogger(c)
 
@@ -39,6 +63,6 @@ func handleError(c *gin.Context, err error) {
 		c.JSON(apiErr.code, apiErr.message)
 	} else {
 		logger.Error("Unhandled internal error", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "An internal server error occurred"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": ErrInternalServer})
 	}
 }
