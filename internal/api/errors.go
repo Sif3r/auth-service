@@ -7,10 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Common error messages to avoid duplication
 const (
 	ErrInvalidRequestBody = "Invalid request body"
-	ErrInvalidCredentials = "Invalid credentials"
+	ErrInvalidCredentials = "Invalid credentials" // #nosec G101
 	ErrUserNotFound       = "User not found"
 	ErrInternalServer     = "An internal server error occurred"
 )
