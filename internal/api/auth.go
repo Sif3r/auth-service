@@ -23,10 +23,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 	logger := getLogger(c)
 
 	if err = c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
@@ -38,34 +35,21 @@ func (h *Handler) LoginUser(c *gin.Context) {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(
-				c,
-				newAPIError(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"}, err),
-			)
+			handleError(c, newInvalidCredentialsError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"}, err))
+			handleError(c, newInternalServerError("Failed to retrieve user", err))
 		}
 		return
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.Password)); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"}, err),
-		)
+		handleError(c, newInvalidCredentialsError(err))
 		return
 	}
 
 	refreshToken, accessToken, err := h.tokenManager.GenerateTokens(user.ID.String())
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to generate tokens"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to generate tokens", err))
 		return
 	}
 
@@ -83,10 +67,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 func (h *Handler) Logout(c *gin.Context) {
 	var req Logout
 	if err := c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
@@ -105,14 +86,7 @@ func (h *Handler) Logout(c *gin.Context) {
 
 	err = h.tokenManager.BlacklistJTI(c.Request.Context(), claims.ID, claims.ExpiresAt.Time.Unix())
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to blacklist token"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to blacklist token", err))
 		return
 	}
 
@@ -122,10 +96,7 @@ func (h *Handler) Logout(c *gin.Context) {
 func (h *Handler) RefreshToken(c *gin.Context) {
 	var req RefreshToken
 	if err := c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
@@ -159,30 +130,16 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 	_, err = h.repo.GetUserByID(c.Request.Context(), pgUserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(
-				c,
-				newAPIError(
-					http.StatusUnauthorized,
-					gin.H{"error": "User not found, refresh token invalidated"},
-					err,
-				),
-			)
+			handleError(c, newUserNotFoundError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to validate user for refresh"}, err))
+			handleError(c, newInternalServerError("Failed to validate user for refresh", err))
 		}
 		return
 	}
 
 	newRefreshToken, newAccessToken, err := h.tokenManager.GenerateTokens(claims.UserID)
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to generate new tokens"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to generate new tokens", err))
 		return
 	}
 
@@ -196,27 +153,13 @@ func (h *Handler) GetPublicKey(c *gin.Context) {
 	logger := getLogger(c)
 	pubKey := h.tokenManager.GetPublicToken()
 	if pubKey == nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Public key not found in token manager"},
-				errors.New("public key is nil"),
-			),
-		)
+		handleError(c, newInternalServerError("Public key not found in token manager", errors.New("public key is nil")))
 		return
 	}
 
 	j, err := jwk.Import(pubKey)
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to convert public key to JWK"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to convert public key to JWK", err))
 		return
 	}
 
@@ -232,14 +175,7 @@ func (h *Handler) GetPublicKey(c *gin.Context) {
 
 	keySet := jwk.NewSet()
 	if err = keySet.AddKey(j); err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to add public key to JWK Set"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to add public key to JWK Set", err))
 		return
 	}
 

@@ -18,10 +18,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	logger := getLogger(c)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
@@ -57,7 +54,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 				),
 			)
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to create user"}, err))
+			handleError(c, newInternalServerError("Failed to create user", err))
 		}
 		return
 	}
@@ -79,9 +76,9 @@ func (h *Handler) GetUserInfo(c *gin.Context) {
 	user, err := h.repo.GetUserByID(c.Request.Context(), pgUserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(c, newAPIError(http.StatusNotFound, gin.H{"error": "User not found"}, err))
+			handleError(c, newUserNotFoundError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user information"}, err))
+			handleError(c, newInternalServerError("Failed to retrieve user information", err))
 		}
 		return
 	}
@@ -104,19 +101,16 @@ func (h *Handler) UpdateUserInfo(c *gin.Context) {
 	_, err = h.repo.GetUserByID(c.Request.Context(), pgUserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(c, newAPIError(http.StatusNotFound, gin.H{"error": "User not found"}, err))
+			handleError(c, newUserNotFoundError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user for update"}, err))
+			handleError(c, newInternalServerError("Failed to retrieve user for update", err))
 		}
 		return
 	}
 
 	var req UpdateUser
 	if err = c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
@@ -176,9 +170,9 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	err = h.repo.DeleteUser(c.Request.Context(), pgUserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(c, newAPIError(http.StatusNotFound, gin.H{"error": "User not found"}, err))
+			handleError(c, newUserNotFoundError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"}, err))
+			handleError(c, newInternalServerError("Failed to delete user", err))
 		}
 		return
 	}
@@ -194,44 +188,28 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 
 	var req ChangePassword
 	if err = c.ShouldBindJSON(&req); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusBadRequest, gin.H{"error": "Invalid request body"}, err),
-		)
+		handleError(c, newInvalidRequestBodyError(err))
 		return
 	}
 
 	user, err := h.repo.GetUserByID(c.Request.Context(), pgUserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			handleError(
-				c,
-				newAPIError(http.StatusUnauthorized, gin.H{"error": "User not found"}, err),
-			)
+			handleError(c, newInvalidCredentialsError(err))
 		} else {
-			handleError(c, newAPIError(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user for password change"}, err))
+			handleError(c, newInternalServerError("Failed to retrieve user for password change", err))
 		}
 		return
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.CurrentPassword)); err != nil {
-		handleError(
-			c,
-			newAPIError(http.StatusUnauthorized, gin.H{"error": "Invalid current password"}, err),
-		)
+		handleError(c, newInvalidCredentialsError(err))
 		return
 	}
 
 	newPasswordHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to hash new password"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to hash new password", err))
 		return
 	}
 
@@ -243,14 +221,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		},
 	)
 	if err != nil {
-		handleError(
-			c,
-			newAPIError(
-				http.StatusInternalServerError,
-				gin.H{"error": "Failed to update password"},
-				err,
-			),
-		)
+		handleError(c, newInternalServerError("Failed to update password", err))
 		return
 	}
 
