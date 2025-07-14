@@ -446,6 +446,69 @@ paths:
                 updateFailed:
                   value:
                     error: Failed to update password
+  /v1/{provider}:
+    get:
+      summary: Begin OAuth Authentication
+      operationId: BeginOAuth
+      description: Initiates the OAuth authentication process with the specified provider (e.g., Google, GitHub). Redirects the user to the provider's login page.
+      tags:
+        - OAuth
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The OAuth provider (e.g., google, github)
+      responses:
+        '302':
+          description: Redirects to the OAuth provider's login page.
+        '400':
+          description: Bad Request - Invalid provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/{provider}/callback:
+    get:
+      summary: OAuth Callback
+      operationId: OAuthCallback
+      description: Handles the OAuth callback from the provider. On success, returns JWT access and refresh tokens.
+      tags:
+        - OAuth
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The OAuth provider (e.g., google, github)
+      responses:
+        '200':
+          description: Authentication successful. Access and refresh tokens are returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Bad Request - Invalid callback parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     RegisterUser:
@@ -613,3 +676,6 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: A JWT access token is required to access this endpoint. It should be provided in the Authorization header as a Bearer token.
+tags:
+  - name: OAuth
+    description: OAuth 2.0 authentication endpoints
